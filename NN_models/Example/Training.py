@@ -35,6 +35,40 @@ def custom_loss(model, y_true, Xa_pred, Sk_true, Sk, X):
    
     return  loss_data + loss_sen # 0*loss_sen when standard training
 
+#Load dataset
+df = pd.read_csv('data_example_dispersion.csv')
+
+tau = df['Residence time (s)'].values
+k = df['k (s^-1)'].values
+Xa = df['Xa'].values
+dXadk = df['dXadk'].values
+
+bounds = [(10, 90), (1e-3, 0.1)] #tau (s), k (s-1)
+X = np.column_stack((tau, k))
+y = Xa.reshape(-1, 1)
+Sk = dXadk.reshape(-1, 1)
+
+#Determine the derivative of the scaled values: df/dx * range(x)/range(f(x))
+Sk = Sk * (bounds[1][1] - bounds[1][0])
+
+#Normalize X values 
+X_scaled = np.column_stack(((X[:, 0] - bounds[0][0]) / (bounds[0][1] - bounds[0][0]), 
+                            (X[:, 1] - bounds[1][0]) / (bounds[1][1] - bounds[1][0])))
+
+#Normalize the derivative of the normalized values
+Sk_scaled = (Sk - Sk.min(axis=0))/(Sk.max(axis=0) - Sk.min(axis=0))
+
+# Splitting data into training and testing sets
+X_train, X_test, y_train, y_test, Sk_train, Sk_test = train_test_split(X_scaled, y, Sk_scaled, test_size=0.20, random_state=42)
+
+X_train_tensor = torch.tensor(X_train, dtype=torch.float32)
+y_train_tensor = torch.tensor(y_train, dtype=torch.float32) 
+X_test_tensor = torch.tensor(X_test, dtype=torch.float32)
+y_test_tensor = torch.tensor(y_test, dtype=torch.float32)  
+
+Sk_train_tensor = torch.tensor(Sk_train, dtype=torch.float32).squeeze()  
+Sk_test_tensor = torch.tensor(Sk_test, dtype=torch.float32).squeeze()  
+
 # Training loop
 num_epochs = 10000
 patience = 50
