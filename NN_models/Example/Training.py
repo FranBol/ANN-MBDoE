@@ -27,4 +27,4 @@ def custom_loss(model, y_true, Xa_pred, Sk_true, Sk, X):
         
     loss_sen = nn.MSELoss()(du_dk_scaled, Sk_true) 
    
-    return  loss_data + loss_sen, loss_data, loss_sen #0*loss_sen when standard training
+    return  loss_data + loss_sen # 0*loss_sen when standard training
