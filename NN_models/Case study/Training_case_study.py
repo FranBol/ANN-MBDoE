@@ -43,7 +43,7 @@ def custom_loss(model, y_true, y_pred, dadk1_true, dadk2_true, dadk1, dadk2, X):
 df = pd.read_csv('data_case_study.csv')
 
 tau = df['Residence Time (min)'].values
-ratio = df_simulation['Tyrosine ratio'].values
+ratio = df['Tyrosine ratio'].values
 k1 = df['k1'].values
 k2 = df['k2'].values
 area = df['area'].values
@@ -125,5 +125,5 @@ for epoch in range(num_epochs):
     if patience_counter >= patience:
         break
         
-    if epoch % 1000 == 0:
+    if epoch % 100 == 0:
         print(f"Epoch {epoch}, Train Loss: {loss.item()}, Test Loss: {test_loss.item()}")
