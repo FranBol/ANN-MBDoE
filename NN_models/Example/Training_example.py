@@ -117,7 +117,7 @@ for epoch in range(num_epochs):
         patience_counter += 1
 
     if patience_counter >= patience:
-        print(f"[Run {i}] Early stop at epoch {epoch}")
+        print(f"Early stop at epoch {epoch}")
         break
 
     if epoch % 500 == 0:
