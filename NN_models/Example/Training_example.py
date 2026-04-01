@@ -28,7 +28,7 @@ def custom_loss(y_true, y_pred, Sk_true, X):
         create_graph=True
     )[0]
     
-    # Extract the gradient specifically for k 
+    # Extract the gradient for k 
     du_dk = gradients[:, 1]
     
     # Normalize the gradients 
