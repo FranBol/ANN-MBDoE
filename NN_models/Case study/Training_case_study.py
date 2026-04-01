@@ -3,6 +3,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import pandas as pd
+import copy
 from sklearn.model_selection import train_test_split
 
 class Model(nn.Module):
