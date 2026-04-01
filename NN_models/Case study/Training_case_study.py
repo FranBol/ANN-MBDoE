@@ -108,6 +108,7 @@ num_epochs = 10000
 patience = 500
 model     = Model()
 optimizer = optim.Adam(model.parameters(), lr=0.01)
+
 best_loss        = float('inf')
 patience_counter = 0
 best_model_state = None
