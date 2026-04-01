@@ -16,28 +16,28 @@ class Model(nn.Module):
         x = self.fc2(x)
         return x
 
-def custom_loss(model, y_true, y_pred, dadk1_true, dadk2_true, dadk1, dadk2, X):
+def custom_loss(y_true, y_pred, dadk1_true, dadk2_true, X):
     
-    loss_data = nn.MSELoss()(y_pred, y_true)
+    loss_data = nn.MSELoss()(y_pred, y_true)    
     
-    tau_tensor = X[:, 0]   
-    ratio_tensor = X[:, 1]
-    k1_tensor = X[:, 2].requires_grad_(True)
-    k2_tensor = X[:, 3].requires_grad_(True)
+    gradients = torch.autograd.grad(
+        outputs=y_pred, 
+        inputs=X, 
+        grad_outputs=torch.ones_like(y_pred), 
+        create_graph=True
+    )[0]
     
-    # Forward pass
-    u = model(torch.stack([tau_tensor, ratio_tensor, k1_tensor, k2_tensor], dim=1))    
-
-    du_dk1 = torch.autograd.grad(u.sum(), k1_tensor, create_graph=True)[0]
-    du_dk2 = torch.autograd.grad(u.sum(), k2_tensor, create_graph=True)[0]
-
-    # Adjust the gradients to obtain normalized gradients        
-    du_dk1_scaled =  (du_dk1 - dadk1.min())/(dadk1.max() - dadk1.min())
-    du_dk2_scaled =  (du_dk2 - dadk2.min())/(dadk2.max() - dadk2.min())
-        
+    # Extract the gradient for k1 and k2 
+    du_dk1 = gradients[:, 2]    
+    du_dk2 = gradients[:, 3]
+    
+    # Normalize the gradients 
+    du_dk1_scaled = (du_dk1 - dadk1.min()) / (dadk1.max() - dadk1.min())   
+    du_dk2_scaled = (du_dk2 - dadk2.min()) / (dadk2.max() - dadk2.min()) 
+    
     loss_sen = nn.MSELoss()(torch.stack([du_dk1_scaled, du_dk2_scaled]), torch.stack([dadk1_true, dadk2_true]))
    
-    return  loss_data + loss_sen #0*loss_sen when standard training
+    return loss_data + loss_sen # 0 * loss_sen when standard training
 
 #Load dataset
 df = pd.read_csv('data_case_study.csv')
@@ -73,57 +73,79 @@ y_scaled = (y - y.min())/(y.max()-y.min())
 dadk1_scaled = (dadk1 - dadk1.min(axis=0))/(dadk1.max(axis=0) - dadk1.min(axis=0))
 dadk2_scaled = (dadk2 - dadk2.min(axis=0))/(dadk2.max(axis=0) - dadk2.min(axis=0))
 
-# Splitting data into training and testing sets
-X_train, X_test, y_train, y_test, dadk1_train, dadk1_test, dadk2_train, dadk2_test = train_test_split(X_scaled, y_scaled, dadk1_scaled, dadk2_scaled,
-                                                                                                      test_size=0.20, random_state=42)
+# First split: Train (70%) and Temp (30%)
+X_train, X_temp, y_train, y_temp, dadk1_train, dadk1_temp, dadk2_train, dadk2_temp = train_test_split(
+    X_scaled, y_scaled, dadk1_scaled, dadk2_scaled,
+    test_size=0.30, random_state=42
+)
+
+# Second split: Validation (15%) and Test (15%)
+X_val, X_test, y_val, y_test, dadk1_val, dadk1_test, dadk2_val, dadk2_test = train_test_split(
+    X_temp, y_temp, dadk1_temp, dadk2_temp,
+    test_size=0.50, random_state=42
+)
+
+# Convert to tensors
 X_train_tensor = torch.tensor(X_train, dtype=torch.float32)
-y_train_tensor = torch.tensor(y_train, dtype=torch.float32) 
+y_train_tensor = torch.tensor(y_train, dtype=torch.float32)
+
+X_val_tensor = torch.tensor(X_val, dtype=torch.float32)
+y_val_tensor = torch.tensor(y_val, dtype=torch.float32)
+
 X_test_tensor = torch.tensor(X_test, dtype=torch.float32)
-y_test_tensor = torch.tensor(y_test, dtype=torch.float32)  
+y_test_tensor = torch.tensor(y_test, dtype=torch.float32)
 
-dadk1_train_tensor = torch.tensor(dadk1_train, dtype=torch.float32).squeeze()  
-dadk1_test_tensor = torch.tensor(dadk1_test, dtype=torch.float32).squeeze()  
+dadk1_train_tensor = torch.tensor(dadk1_train, dtype=torch.float32).squeeze()
+dadk1_val_tensor = torch.tensor(dadk1_val, dtype=torch.float32).squeeze()
+dadk1_test_tensor = torch.tensor(dadk1_test, dtype=torch.float32).squeeze()
 
-dadk2_train_tensor = torch.tensor(dadk2_train, dtype=torch.float32).squeeze()  
-dadk2_test_tensor = torch.tensor(dadk2_test, dtype=torch.float32).squeeze()  
+dadk2_train_tensor = torch.tensor(dadk2_train, dtype=torch.float32).squeeze()
+dadk2_val_tensor = torch.tensor(dadk2_val, dtype=torch.float32).squeeze()
+dadk2_test_tensor = torch.tensor(dadk2_test, dtype=torch.float32).squeeze()
 
 # Training loop
 num_epochs = 10000
-patience = 50
-best_loss = float('inf')
-patience_counter = 0
-    
-model = Model()
+patience = 500
+model     = Model()
 optimizer = optim.Adam(model.parameters(), lr=0.01)
+best_loss        = float('inf')
+patience_counter = 0
+best_model_state = None
 
 for epoch in range(num_epochs):
+    # train
     model.train()
     optimizer.zero_grad()
-        
-    # Forward pass
-    y_pred = model(X_train_tensor)  
-        
-    # Compute loss
-    loss = custom_loss(model, y_train_tensor, y_pred, dadk1_train_tensor, dadk2_train_tensor, dadk1, dadk2, X_train_tensor)
-        
-    # Backward pass and optimization
+    X_train_tensor.requires_grad_(True)
+    y_pred = model(X_train_tensor)
+    loss = custom_loss(y_train_tensor, y_pred, dadk1_train_tensor, dadk2_train_tensor, X_train_tensor)
     loss.backward()
     optimizer.step()
 
-    model.eval()
+    # validate
+    X_val_tensor.requires_grad_(True)
+    y_val_pred = model(X_val_tensor)
+    val_loss = custom_loss(y_val_tensor, y_val_pred, dadk1_val_tensor, dadk2_val_tensor, X_val_tensor)
+    val_loss_val = val_loss.item()
         
-    y_test_pred = model(X_test_tensor)
-    test_loss = custom_loss(model, y_test_tensor, y_test_pred, dadk1_test_tensor, dadk2_test_tensor, dadk1, dadk2, X_test_tensor)
-        
-    # Early stopping
-    if test_loss < best_loss:
-        best_loss = test_loss
+    if val_loss_val < best_loss:     
+        best_loss        = val_loss_val
         patience_counter = 0
+        best_model_state = copy.deepcopy(model.state_dict()) 
     else:
         patience_counter += 1
-                
+
     if patience_counter >= patience:
+        print(f"Early stop at epoch {epoch}")
         break
-        
-    if epoch % 100 == 0:
-        print(f"Epoch {epoch}, Train Loss: {loss.item()}, Test Loss: {test_loss.item()}")
+
+    if epoch % 500 == 0:
+        print(f" Epoch {epoch:5d} | Train {loss.item():.6f} | Val {val_loss_val:.6f} | ")
+
+model.load_state_dict(best_model_state)
+
+# test 
+model.eval()
+X_test_tensor.requires_grad_(True)
+y_test_pred = model(X_test_tensor)
+test_loss = custom_loss(y_test_tensor, y_test_pred, dadk1_test_tensor, dadk2_test_tensor, X_test_tensor)
