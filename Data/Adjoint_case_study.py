@@ -80,15 +80,14 @@ def compute_sensitivity_adjoint(tau, ratio, k1_val, k2_val):
     k2 = torch.tensor(k2_val,  dtype=torch.float64, requires_grad=True)
     ratio_t = torch.tensor(ratio,   dtype=torch.float64)
      
-    func = ODEfunc(k1, k2, ratio_t, u, D, dz, duration)
-    scripted_func = torch.jit.script(func)
+    func = ODEfunc(k1, k2, ratio_t, u, D, dz, duration)    
  
     # Time grid and initial conditions
     t_eval = torch.linspace(0, 3.0 * t_res, 2000, dtype=torch.float64)
     C0 = torch.zeros(4 * Nz, dtype=torch.float64)
  
     # Forward solve via adjoint
-    sol = odeint(scripted_func, C0, t_eval, method='dopri5', adjoint_method='dopri5')
+    sol = odeint(func, C0, t_eval, method='dopri5', adjoint_method='dopri5')
  
     CB_out = sol[:, Nz + Nz - 2]
     dt = t_eval[1] - t_eval[0]
