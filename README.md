@@ -27,4 +27,4 @@ The saved models can subsequently be used as surrogate models within a MBDoE opt
 
 ### 3. Sequential experimental design (`Sequential planning/`)
  
-`MBDoE.py` embeds the trained surrogates into a the MBDoE framework. The Fisher Information Matrix is computed using the ANN gradients and the next D-optimal experimental conditions are suggested to maximally improve kinetic parameter estimation.
+`MBDoE.py` embeds the trained surrogates into a the MBDoE framework. The Fisher Information Matrix is computed using the ANN gradients and the next D-optimal experimental conditions are suggested to improve kinetic parameter estimation.
