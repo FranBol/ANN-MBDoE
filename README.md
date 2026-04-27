@@ -23,7 +23,7 @@ For each system, both a **standard ANN** and a **gradient-enhanced ANN** are tra
 - `Training_example.py` — for the illustrative example
 - `Training_case_study.py` — for the case study
 
-The saved models can subsequently be used as surrogate models within a MBDoE optimisation loop.
+The saved models can subsequently be used as surrogate models within a MBDoE optimization loop.
 
 ### 3. Sequential experimental design (`Sequential planning/`)
  
